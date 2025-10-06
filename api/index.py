@@ -99,7 +99,6 @@ def process_charts_data(stock, facts):
     except Exception as e:
         logging.warning(f"Could not generate yfinance balance sheet charts. Error: {e}")
     
-    # **REWRITTEN**: This logic is now more robust to prevent silent failures.
     try:
         if q_cash_flow is not None and not q_cash_flow.empty:
             df = q_cash_flow.T.head(8).iloc[::-1]
@@ -124,7 +123,6 @@ def process_charts_data(stock, facts):
     except Exception as e:
         logging.warning(f"Could not generate dividend chart. Error: {e}")
         
-    # **REWRITTEN**: This logic is now more robust to prevent silent failures.
     try:
         hist_5y = stock.history(period="5y")
         if not hist_5y.empty:
