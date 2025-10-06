@@ -6,5 +6,4 @@ yfinance
 sec-edgar-api
 pandas
 requests
-google-generativeai
 numpy
