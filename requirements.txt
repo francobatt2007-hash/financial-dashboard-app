@@ -5,3 +5,4 @@ sec-edgar-api
 pandas
 requests
 numpy
+google-generativeai
