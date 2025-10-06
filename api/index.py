@@ -7,8 +7,6 @@ from flask_cors import CORS
 import yfinance as yf
 from sec_edgar_api import EdgarClient
 import pandas as pd
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import datetime
 import numpy as np
 
