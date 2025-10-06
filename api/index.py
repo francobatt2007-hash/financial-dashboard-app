@@ -42,11 +42,6 @@ DEFAULT_USER_AGENT = "Francesco Battaglia franco.batt2007@gmail.com"
 EDGAR_API_KEY = os.environ.get("EDGAR_API_KEY", DEFAULT_USER_AGENT)
 edgar_client = EdgarClient(user_agent=EDGAR_API_KEY)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    logging.error("GEMINI_API_KEY environment variable not found.")
 
 # --- Helper Functions ---
 def get_latest_edgar_value(facts, metric_name):
