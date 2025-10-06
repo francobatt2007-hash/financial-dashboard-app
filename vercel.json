@@ -1,5 +1,4 @@
-// financial-dashboard/vercel.json
-
+// Corrected vercel.json
 {
   "version": 2,
   "builds": [
