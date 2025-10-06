@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Financial Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { background: '#0B1220', surface: '#0F172A', card: '#111827', accent: '#22d3ee' } } }
+    }
+  </script>
+  <style> html, body { height: 100%; } </style>
+</head>
+<body class="min-h-full bg-background text-gray-200 antialiased">
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold tracking-tight">Financial Dashboard</h1>
+      <p class="text-gray-400 mt-1">Query EDGAR & Yahoo Finance for financial metrics by ticker.</p>
+    </header>
+
+    <section class="bg-surface/80 border border-white/5 rounded-xl p-6 shadow-lg backdrop-blur">
+      <div class="flex flex-col sm:flex-row gap-4 items-end">
+        <div class="flex-1">
+          <label for="tickerInput" class="block text-sm font-medium text-gray-400 mb-1">Stock Ticker</label>
+          <input id="tickerInput" type="text" placeholder="e.g., AAPL" class="w-full rounded-lg bg-card/80 border border-white/10 px-4 py-3 text-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent/60">
+        </div>
+        <button id="searchBtn" class="w-full sm:w-auto rounded-lg bg-cyan-500 hover:bg-cyan-400 text-gray-900 font-bold px-6 py-3 text-lg transition-colors">Search</button>
+      </div>
+      <p id="errorMsg" class="hidden mt-3 text-sm text-red-400"></p>
+    </section>
+
+    <div id="loading" class="hidden text-center py-10"><span class="text-gray-400">Fetching data…</span></div>
+
+    <section id="results" class="hidden mt-8 space-y-8">
+        <div class="flex justify-between items-start">
+            <div>
+                <h2 id="companyName" class="text-2xl font-bold text-white"></h2>
+                <p class="text-sm text-gray-400">CIK: <span id="companyCik"></span> | Sector: <span id="companySector"></span></p>
+            </div>
+            <div class="text-right">
+                <div id="currentPrice" class="text-3xl font-bold text-white"></div>
+                <div class="text-sm text-gray-400">Current Price (USD)</div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+             <div class="bg-surface border border-white/5 rounded-xl p-4"><div class="text-sm text-gray-400">Revenues (Latest 10-K)</div><div id="revenues" class="text-2xl font-semibold mt-1"></div></div>
+             <div class="bg-surface border border-white/5 rounded-xl p-4"><div class="text-sm text-gray-400">Net Income (Latest 10-K)</div><div id="netIncome" class="text-2xl font-semibold mt-1"></div></div>
+             <div class="bg-surface border border-white/5 rounded-xl p-4"><div class="text-sm text-gray-400">Assets (Latest 10-K)</div><div id="assets" class="text-2xl font-semibold mt-1"></div></div>
+             <div class="bg-surface border border-white/5 rounded-xl p-4"><div class="text-sm text-gray-400">Liabilities (Latest 10-K)</div><div id="liabilities" class="text-2xl font-semibold mt-1"></div></div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
+            <div class="bg-surface border border-white/5 rounded-xl p-5 space-y-2"><h4 class="font-semibold text-white mb-2">Valuation</h4>
+                <div class="flex justify-between"><span class="text-gray-400">Market Cap</span><span id="marketCap" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Trailing P/E</span><span id="trailingPE" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Price/Sales (ttm)</span><span id="priceToSales" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">EV/EBITDA</span><span id="evToEbitda" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Price/Book (mrq)</span><span id="priceToBook" class="font-semibold"></span></div>
+            </div>
+             <div class="bg-surface border border-white/5 rounded-xl p-5 space-y-2"><h4 class="font-semibold text-white mb-2">Cash Flow</h4>
+                <div class="flex justify-between"><span class="text-gray-400">FCF Yield</span><span id="fcfYield" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">FCF / Share</span><span id="fcfPerShare" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Op. Cash Flow</span><span id="operatingCashflow" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Free Cash Flow</span><span id="freeCashflow" class="font-semibold"></span></div>
+            </div>
+             <div class="bg-surface border border-white/5 rounded-xl p-5 space-y-2"><h4 class="font-semibold text-white mb-2">Margins & Growth</h4>
+                <div class="flex justify-between"><span class="text-gray-400">Profit Margin</span><span id="profitMargin" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Operating Margin</span><span id="operatingMargin" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Quarterly Revenue (YoY)</span><span id="revenueGrowth" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Quarterly Earnings (YoY)</span><span id="earningsGrowth" class="font-semibold"></span></div>
+            </div>
+            <div class="bg-surface border border-white/5 rounded-xl p-5 space-y-2"><h4 class="font-semibold text-white mb-2">Balance Sheet & Dividend</h4>
+                <div class="flex justify-between"><span class="text-gray-400">Cash</span><span id="totalCash" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Debt</span><span id="totalDebt" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Net Cash / Debt</span><span id="netDebt" class="font-semibold"></span></div>
+                <div class="flex justify-between pt-2 border-t border-white/10 mt-2"><span class="text-gray-400">Dividend Yield</span><span id="dividendYield" class="font-semibold"></span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Ex-Dividend Date</span><span id="exDividendDate" class="font-semibold"></span></div>
+            </div>
+        </div>
+
+        <div id="chartsContainer" class="hidden">
+            <div id="chartsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+        </div>
+
+        <div id="newsSection" class="hidden">
+            <h3 class="text-xl font-semibold text-white mb-4">Latest News</h3>
+            <div id="newsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="text-center text-gray-400 md:col-span-2">Fetching news...</div>
+            </div>
+        </div>
+    </section>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    // *** THIS IS THE ONLY LINE THAT WAS CHANGED ***
+    const apiBase = ''; // Was 'http://127.0.0.1:5001'
+    const chartInstances = {};
+    let currentTicker = '';
+
+    const formatters = {
+        currency: (val, dec = 2) => val || val === 0 ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: dec, maximumFractionDigits: dec }).format(val) : '—',
+        number: (val, dec = 2) => val || val === 0 ? Number(val).toFixed(dec) : '—',
+        largeNumber: val => {
+            if (!val && val !== 0) return '—';
+            const sign = val < 0 ? '-' : '';
+            val = Math.abs(val);
+            if (val >= 1e12) return `${sign}${(val / 1e12).toFixed(2)}T`;
+            if (val >= 1e9) return `${sign}${(val / 1e9).toFixed(2)}B`;
+            if (val >= 1e6) return `${sign}${(val / 1e6).toFixed(2)}M`;
+            return val.toLocaleString('en-US');
+        },
+        percentage: val => val || val === 0 ? `${(val * 100).toFixed(2)}%` : '—',
+        integer: val => val || val === 0 ? val.toLocaleString('en-US') : '—'
+    };
+    
+    const populate = (id, data, formatter = val => val || '—') => {
+        const el = $(`#${id}`);
+        if (el) el.textContent = formatter(data);
+    };
+    
+    function setLoading(isLoading) { $('#loading').classList.toggle('hidden', !isLoading); }
+    function setError(msg) {
+        const el = $('#errorMsg');
+        el.textContent = msg || '';
+        el.classList.toggle('hidden', !msg);
+    }
+    
+    async function updatePriceChart(range) {
+        if (!currentTicker) return;
+
+        document.querySelectorAll('#price-range-selector button').forEach(btn => {
+            btn.classList.toggle('bg-cyan-500', btn.dataset.range === range);
+            btn.classList.toggle('text-gray-900', btn.dataset.range === range);
+            btn.classList.toggle('bg-card/80', btn.dataset.range !== range);
+        });
+
+        try {
+            const resp = await fetch(`${apiBase}/api/price-history/${currentTicker}/${range}`);
+            if (!resp.ok) throw new Error('Failed to load price data.');
+            const priceData = await resp.json();
+            
+            const chart = chartInstances['price'];
+            if (chart) {
+                chart.data.labels = priceData.labels;
+                chart.data.datasets = priceData.datasets.map(ds => ({...ds, backgroundColor: 'rgba(16, 185, 129, 0.6)', borderColor: '#10b981', borderWidth: 1.5}));
+                
+                const isIntraday = range === '1d' || range === '5d';
+                chart.options.scales.x.time.unit = isIntraday ? 'hour' : 'month';
+                
+                chart.update();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function renderCharts(chartsData) {
+        const container = $('#chartsContainer'), grid = $('#chartsGrid');
+        grid.innerHTML = '';
+        Object.values(chartInstances).forEach(chart => chart.destroy());
+        if (!chartsData) { container.classList.add('hidden'); return; }
+        container.classList.remove('hidden');
+        
+        const colors = [
+            { bg: 'rgba(34, 211, 238, 0.6)', border: '#22d3ee' }, { bg: 'rgba(245, 158, 11, 0.6)', border: '#f59e0b' },
+            { bg: 'rgba(16, 185, 129, 0.6)', border: '#10b981' }, { bg: 'rgba(239, 68, 68, 0.6)', border: '#ef4444' },
+            { bg: 'rgba(139, 92, 246, 0.6)', border: '#8b5cf6' }
+        ];
+
+        const chartLayout = [
+            { id: 'price', span: 'lg:col-span-3' },
+            { id: 'revenueAndEarnings', span: 'lg:col-span-1' }, { id: 'earningsPerShare', span: 'lg:col-span-1' }, { id: 'ebitda', span: 'lg:col-span-1' },
+            { id: 'assetsVsLiabilities', span: 'lg:col-span-1' }, { id: 'cashVsDebt', span: 'lg:col-span-1' }, { id: 'returnOfCapital', span: 'lg:col-span-1' },
+            { id: 'dividends', span: 'lg:col-span-1' }, { id: 'sharesOutstanding', span: 'lg:col-span-1' }, { id: 'historicalRatios', span: 'lg:col-span-1' }
+        ];
+
+        chartLayout.forEach(({ id, span }) => {
+            // **FIXED**: Check if data exists BEFORE creating the chart container, unless it's the special 'price' chart.
+            if (!chartsData[id] && id !== 'price') {
+                return; // Skip creating this chart entirely if its data is missing.
+            }
+
+            const info = chartsData[id] || { title: 'Price' };
+            const wrapper = document.createElement('div');
+            wrapper.className = `bg-surface border border-white/5 rounded-xl p-5 h-96 flex flex-col ${span}`;
+            
+            let headerHTML = `<h4 class="text-md font-medium text-gray-300 mb-3">${info.title}</h4>`;
+            if (id === 'price') {
+                headerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-md font-medium text-gray-300">Price</h4>
+                        <div id="price-range-selector" class="flex items-center space-x-1 rounded-lg bg-card/50 p-1 text-xs">
+                            <button data-range="1d" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">1D</button>
+                            <button data-range="5d" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">5D</button>
+                            <button data-range="1m" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">1M</button>
+                            <button data-range="6m" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">6M</button>
+                            <button data-range="1y" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">1Y</button>
+                            <button data-range="5y" class="px-2 py-1 rounded-md transition-colors hover:bg-cyan-500/50">5Y</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            wrapper.innerHTML = `${headerHTML}<div class="relative flex-grow"><canvas id="${id}"></canvas></div>`;
+            grid.appendChild(wrapper);
+
+            if (id === 'price') {
+                document.querySelectorAll('#price-range-selector button').forEach(button => {
+                    button.addEventListener('click', () => updatePriceChart(button.dataset.range));
+                });
+            }
+
+            const datasets = (chartsData[id]?.datasets || []).map((ds, i) => ({ ...ds, backgroundColor: ds.fill ? colors[2].bg : colors[i % colors.length].bg, borderColor: ds.fill ? colors[2].border : colors[i % colors.length].border, borderWidth: 1.5 }));
+            const isTimeSeries = id === 'price' || id === 'historicalRatios';
+            const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: datasets.length > 1, labels: { color: '#D1D5DB' } }, tooltip: { enabled: true, mode: 'index', intersect: false, } }, interaction: { mode: 'index', intersect: false, }, scales: { x: { type: isTimeSeries ? 'timeseries' : 'category', time: isTimeSeries ? { unit: 'month' } : undefined, ticks: { color: '#9CA3AF', maxRotation: 0, autoSkip: true, autoSkipPadding: 20 }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }, y: { ticks: { color: '#9CA3AF', callback: (val) => (id === 'price') ? formatters.currency(val) : (id === 'historicalRatios' ? formatters.number(val, 1) : formatters.largeNumber(val)) }, grid: { color: 'rgba(255, 255, 255, 0.1)' } } } };
+            
+            if (id === 'price') {
+                chartInstances[id] = new Chart($(`#${id}`).getContext('2d'), { type: 'line', data: { labels: [], datasets: [] }, options: options });
+            } else {
+                chartInstances[id] = new Chart($(`#${id}`).getContext('2d'), { type: info.type || 'bar', data: { labels: chartsData[id].labels, datasets: datasets }, options: options });
+            }
+        });
+    }
+    
+    function renderResults(data) {
+        $('#results').classList.remove('hidden');
+        populate('companyName', data.companyInfo.name);
+        populate('companyCik', data.companyInfo.cik);
+        populate('companySector', data.companyInfo.sector);
+        populate('currentPrice', data.quote.currentPrice, formatters.currency);
+        populate('assets', data.financials_edgar.assets, formatters.largeNumber);
+        populate('liabilities', data.financials_edgar.liabilities, formatters.largeNumber);
+        populate('revenues', data.financials_edgar.revenues, formatters.largeNumber);
+        populate('netIncome', data.financials_edgar.netIncome, formatters.largeNumber);
+        populate('marketCap', data.valuation.marketCap, formatters.largeNumber);
+        populate('trailingPE', data.valuation.trailingPE, formatters.number);
+        populate('priceToSales', data.valuation.priceToSales, formatters.number);
+        populate('evToEbitda', data.valuation.evToEbitda, formatters.number);
+        populate('priceToBook', data.valuation.priceToBook, formatters.number);
+        populate('fcfYield', data.cashFlowMetrics.fcfYield, formatters.percentage);
+        populate('fcfPerShare', data.cashFlowMetrics.fcfPerShare, formatters.currency);
+        populate('operatingCashflow', data.financials_yahoo.operatingCashflow, formatters.largeNumber);
+        populate('freeCashflow', data.financials_yahoo.freeCashflow, formatters.largeNumber);
+        populate('profitMargin', data.profitability.profitMargin, formatters.percentage);
+        populate('operatingMargin', data.profitability.operatingMargin, formatters.percentage);
+        populate('revenueGrowth', data.financials_yahoo.revenueGrowth, formatters.percentage);
+        populate('earningsGrowth', data.financials_yahoo.earningsGrowth, formatters.percentage);
+        populate('totalCash', data.financials_yahoo.totalCash, formatters.largeNumber);
+        populate('totalDebt', data.financials_yahoo.totalDebt, formatters.largeNumber);
+        populate('netDebt', data.financials_yahoo.netDebt, formatters.largeNumber);
+        populate('dividendYield', data.dividends.dividendYield, formatters.percentage);
+        populate('exDividendDate', data.dividends.exDividendDate);
+        renderCharts(data.charts);
+    }
+    
+    async function fetchStockNews(ticker) {
+        $('#newsSection').classList.remove('hidden');
+        const container = $('#newsContainer');
+        container.innerHTML = '<div class="text-center text-gray-400 md:col-span-2">Fetching news...</div>';
+        try {
+            const resp = await fetch(`${apiBase}/api/stock-news/${encodeURIComponent(ticker)}`);
+            if (!resp.ok) throw new Error('Failed to load news.');
+            const news = await resp.json();
+            container.innerHTML = ''; 
+            if (news.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 md:col-span-2">No recent news found.</div>';
+                return;
+            }
+            news.forEach(article => {
+                const articleEl = document.createElement('div');
+                articleEl.className = 'bg-surface border border-white/5 rounded-xl p-4 hover:bg-card transition-colors';
+                articleEl.innerHTML = `
+                    <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="font-semibold text-white hover:text-accent">${article.title}</a>
+                    <p class="text-xs text-gray-400 mt-2">${article.publisher} - ${article.published_date}</p>
+                `;
+                container.appendChild(articleEl);
+            });
+        } catch (err) {
+            container.innerHTML = `<div class="text-center text-red-400 md:col-span-2">${err.message}</div>`;
+        }
+    }
+
+    async function fetchTicker(ticker) {
+        setError('');
+        $('#results').classList.add('hidden');
+        $('#newsSection').classList.add('hidden'); 
+        setLoading(true);
+        currentTicker = ticker.toUpperCase();
+
+        try {
+            const resp = await fetch(`${apiBase}/api/stock-data/${encodeURIComponent(ticker)}`);
+            if (!resp.ok) {
+                const problem = await resp.json().catch(() => ({}));
+                throw new Error(problem.error || `Request failed (${resp.status})`);
+            }
+            renderResults(await resp.json());
+            updatePriceChart('5y');
+            fetchStockNews(ticker);
+        } catch (err) {
+            setError(err.message || 'Failed to fetch data.');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    $('#searchBtn').addEventListener('click', () => {
+        const ticker = ($('#tickerInput').value || '').trim();
+        if (ticker) fetchTicker(ticker); else setError('Please enter a stock ticker.');
+    });
+    $('#tickerInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') $('#searchBtn').click();
+    });
+  </script>
+</body>
+</html>
